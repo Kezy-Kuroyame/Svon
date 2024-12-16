@@ -1,13 +1,13 @@
 import time
 
-from util.OurLangParser import OurLangParser
-from util.OurLangVisitor import OurLangVisitor
+from util.SvonParser import SvonParser
+from util.SvonVisitor import SvonVisitor
 
-variables = {}
-labels, t_var_num = 1, 1
-lines = []
+variables = {}  # Хранит значения переменных
+labels, t_var_num = 1, 1  # Счетчики для меток и временных переменных
+lines = []  # Список строк для хранения промежуточного кода
 
-
+# Обрабатывает аргументы, которые могут быть либо числом, либо кортежем
 def get_args(left, right):
     if isinstance(left, tuple):
         left_val, left_tmp = int(left[0]), str(left[1])
@@ -20,19 +20,19 @@ def get_args(left, right):
         right_val, right_tmp = int(right), int(right)
     return left_val, left_tmp, right_val, right_tmp
 
-
+# Создаёт уникальное имя временной переменной (например, t1, t2).
 def get_var_num():
     global t_var_num
     t_var_num += 1
     return f"t{t_var_num - 1}"
 
-
+# Генерирует уникальную метку (например, L1, L2)
 def get_label():
     global labels
     labels += 1
     return f"L{labels - 1}"
 
-
+# Записывает строки промежуточного кода в файл file.txt
 def fill_file():
     with open('file.txt', 'w') as f:
         for line in lines:
@@ -40,17 +40,19 @@ def fill_file():
 
 
 
-class OurVisitor(OurLangVisitor):
+class Svoner(SvonVisitor):
 
-    def visitProgram(self, ctx: OurLangParser.ProgramContext):
+    # обход программы
+    def visitProgram(self, ctx: SvonParser.ProgramContext):
         self.visitChildren(ctx)
         fill_file()
         return
 
-    def visitStatement(self, ctx: OurLangParser.StatementContext):
+    def visitStatement(self, ctx: SvonParser.StatementContext):
         return self.visitChildren(ctx)
 
-    def visitPrintStatement(self, ctx: OurLangParser.PrintStatementContext):
+    # Выполняет команду print и добавляет её в промежуточный код
+    def visitPrintStatement(self, ctx: SvonParser.PrintStatementContext):
         value = self.visit(ctx.expression())
         if isinstance(value, tuple):
             value_val, value_tmp = value[0], value[1]
@@ -59,7 +61,8 @@ class OurVisitor(OurLangVisitor):
         lines.append(f"print {value_val}\n")
         print(value_val)
 
-    def visitAssignmentStatement(self, ctx: OurLangParser.AssignmentStatementContext):
+    # Обрабатывает присваивание переменной
+    def visitAssignmentStatement(self, ctx: SvonParser.AssignmentStatementContext):
         var_name = ctx.IDENTIFIER().getText()
         value = self.visit(ctx.expression())
 
@@ -71,7 +74,8 @@ class OurVisitor(OurLangVisitor):
         variables[var_name] = value_val
         lines.append(f"{var_name} = {value_tmp}\n")
 
-    def visitIfStatement(self, ctx: OurLangParser.IfStatementContext):
+    # Генерирует промежуточный код для условного оператора if
+    def visitIfStatement(self, ctx: SvonParser.IfStatementContext):
         condition = self.visit(ctx.expression())
         if isinstance(condition, tuple):
             condition_val, condition_tmp = bool(condition[0]), str(condition[1])
@@ -117,13 +121,13 @@ class OurVisitor(OurLangVisitor):
 
         lines.append(f"{label_end}:\n")
 
-    def visitNumberExpr(self, ctx: OurLangParser.NumberExprContext):
+    def visitNumberExpr(self, ctx: SvonParser.NumberExprContext):
         return int(ctx.NUMBER().getText())
 
-    def visitStringExpr(self, ctx: OurLangParser.StringExprContext):
+    def visitStringExpr(self, ctx: SvonParser.StringExprContext):
         return ctx.STRING().getText()[1:-1]
 
-    def visitIdExpr(self, ctx: OurLangParser.IdExprContext):
+    def visitIdExpr(self, ctx: SvonParser.IdExprContext):
 
         var_name = ctx.IDENTIFIER().getText()
 
@@ -139,7 +143,8 @@ class OurVisitor(OurLangVisitor):
             return 0
         return value
 
-    def visitAddSubExpr(self, ctx: OurLangParser.AddSubExprContext):
+    #Генерирует код для операций сложения и вычитания.
+    def visitAddSubExpr(self, ctx: SvonParser.AddSubExprContext):
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
         t = get_var_num()
@@ -157,10 +162,10 @@ class OurVisitor(OurLangVisitor):
             else:
                 right_val, right_tmp = str(right), str(right)
 
-            if ctx.op.type == OurLangParser.PLUS:
+            if ctx.op.type == SvonParser.PLUS:
                 lines.append(f"{t} = {left_tmp} + {right_tmp}\n")
                 return str(left_val) + str(right_val)
-            elif ctx.op.type == OurLangParser.MINUS:
+            elif ctx.op.type == SvonParser.MINUS:
                 raise ValueError("Cannot subtract strings.\n")
 
         # Сложение чисел
@@ -169,14 +174,15 @@ class OurVisitor(OurLangVisitor):
             vals = get_args(left, right)
             left_val, left_tmp, right_val, right_tmp = vals[0], vals[1], vals[2], vals[3]
 
-            if ctx.op.type == OurLangParser.PLUS:
+            if ctx.op.type == SvonParser.PLUS:
                 lines.append(f"{t} = {left_tmp} + {right_tmp}\n")
                 return left_val + right_val, t
             else:
                 lines.append(f"{t} = {left_tmp} - {right_tmp}\n")
                 return left_val - right_val, t
 
-    def visitMulDivExpr(self, ctx: OurLangParser.MulDivExprContext):
+    # Операции умножения и деления
+    def visitMulDivExpr(self, ctx: SvonParser.MulDivExprContext):
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
         t = get_var_num()
@@ -185,20 +191,20 @@ class OurVisitor(OurLangVisitor):
         left_val, left_tmp, right_val, right_tmp = vals[0], vals[1], vals[2], vals[3]
 
         op_map = {
-            OurLangParser.MUL: left_val * right_val,
-            OurLangParser.DIV: left_val // right_val,
-            OurLangParser.POW: pow(left_val, right_val),
-            OurLangParser.MOD: left_val % right_val
+            SvonParser.MUL: left_val * right_val,
+            SvonParser.DIV: left_val // right_val,
+            SvonParser.POW: pow(left_val, right_val),
+            SvonParser.MOD: left_val % right_val
         }
 
         if ctx.op.type in op_map:
-            operator = OurLangParser.literalNames[ctx.op.type].strip("\'")
+            operator = SvonParser.literalNames[ctx.op.type].strip("\'")
             lines.append(f"{t} = {left_tmp} {operator} {right_tmp}\n")
             return op_map[ctx.op.type], t
         else:
             raise ValueError(f"Unknown comparison operator: {ctx.op.type}\n")
 
-    def visitComparisonExpr(self, ctx: OurLangParser.ComparisonExprContext):
+    def visitComparisonExpr(self, ctx: SvonParser.ComparisonExprContext):
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
 
@@ -208,22 +214,22 @@ class OurVisitor(OurLangVisitor):
         left_val, left_tmp, right_val, right_tmp = vals[0], vals[1], vals[2], vals[3]
 
         op_map = {
-            OurLangParser.GT: left_val > right_val,
-            OurLangParser.LT: left_val < right_val,
-            OurLangParser.GE: left_val >= right_val,
-            OurLangParser.LE: left_val <= right_val,
-            OurLangParser.EQ: left_val == right_val,
-            OurLangParser.NEQ: left_val != right_val
+            SvonParser.GT: left_val > right_val,
+            SvonParser.LT: left_val < right_val,
+            SvonParser.GE: left_val >= right_val,
+            SvonParser.LE: left_val <= right_val,
+            SvonParser.EQ: left_val == right_val,
+            SvonParser.NEQ: left_val != right_val
         }
 
         if ctx.op.type in op_map:
-            operator = OurLangParser.literalNames[ctx.op.type].strip("\'")
+            operator = SvonParser.literalNames[ctx.op.type].strip("\'")
             lines.append(f"{t} = {left_tmp} {operator} {right_tmp}\n")
             return op_map[ctx.op.type], t
         else:
             raise ValueError(f"Unknown comparison operator: {ctx.op.type}")
 
-    def visitLogicalExpr(self, ctx: OurLangParser.LogicalExprContext):
+    def visitLogicalExpr(self, ctx: SvonParser.LogicalExprContext):
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
 
@@ -240,14 +246,14 @@ class OurVisitor(OurLangVisitor):
             right_val, right_tmp = bool(right), bool(right)
 
 
-        if ctx.op.type == OurLangParser.AND:
+        if ctx.op.type == SvonParser.AND:
             lines.append(f"{t} = {left_tmp} && {right_val}\n")
             return left_val and right_val, t
         else:
             lines.append(f"{t} = {left_tmp} || {right_val}\n")
             return left_val or right_val, t
 
-    def visitNotExpr(self, ctx: OurLangParser.NotExprContext):
+    def visitNotExpr(self, ctx: SvonParser.NotExprContext):
         value = self.visit(ctx.expression())
         t = get_var_num()
         if isinstance(value, tuple):
@@ -257,10 +263,10 @@ class OurVisitor(OurLangVisitor):
         lines.append(f"{t} = !{value_tmp}\n")
         return not value_val
 
-    def visitParenExpr(self, ctx: OurLangParser.ParenExprContext):
+    def visitParenExpr(self, ctx: SvonParser.ParenExprContext):
         return self.visit(ctx.expression())
 
-    def visitForStatement(self, ctx: OurLangParser.ForStatementContext):
+    def visitForStatement(self, ctx: SvonParser.ForStatementContext):
         self.visit(ctx.declaration)
         label_start = get_label()
         label_end = get_label()
@@ -273,7 +279,7 @@ class OurVisitor(OurLangVisitor):
         lines.append(f"goto {label_start}\n")
         lines.append(f"{label_end}:\n")
 
-    def visitWhileStatement(self, ctx: OurLangParser.WhileStatementContext):
+    def visitWhileStatement(self, ctx: SvonParser.WhileStatementContext):
         label_start = get_label()
         label_end = get_label()
         lines.append(f"ifFalse {self.visit(ctx.expression())[1]} goto {label_end}\n")

@@ -1,13 +1,13 @@
 from antlr4 import *
 from util.SvonLexer import SvonLexer
 from util.SvonParser import SvonParser
-import visitors
+import svoner
 import sys
 
 
 def main():
     try:
-        visitor = visitors.OurVisitor()
+        visitor = visitors.Svoner()
 
         if len(sys.argv) > 1:
             with open(sys.argv[1], 'r') as file:
